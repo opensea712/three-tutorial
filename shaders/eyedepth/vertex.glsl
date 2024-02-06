@@ -1,5 +1,3 @@
-precision highp float;
-
 attribute vec3 a_position;
 
 uniform mat4 u_projectionViewModelMatrix;

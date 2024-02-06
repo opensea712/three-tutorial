@@ -1,5 +1,3 @@
-precision highp float;
-
 varying vec4 v_clipSpacePosition;
 
 const float PackUpscale = 256.0 / 255.0;

@@ -3,13 +3,104 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+// import shaderFragment from './shaders/eyedepth/fragment.glsl';
+// import shaderVertex from './shaders/eyedepth/vertex.glsl';
+
+class EyeBall extends THREE.Mesh {
+  constructor() {
+    let g = new THREE.SphereGeometry(0.1, 64, 32).rotateX(Math.PI * 0.5);
+    let m = new THREE.MeshLambertMaterial({
+      onBeforeCompile: (shader) => {
+        shader.vertexShader = `
+          varying vec3 vPos;
+          ${shader.vertexShader}
+        `.replace(
+          `#include <begin_vertex>`,
+          `#include <begin_vertex>
+            vPos = position;
+          `
+        );
+        console.log(shader.vertexShader);
+        shader.fragmentShader = `
+          varying vec3 vPos;
+          ${shader.fragmentShader}
+        `.replace(
+          `vec4 diffuseColor = vec4( diffuse, opacity );`,
+          `vec4 diffuseColor = vec4( diffuse, opacity );
+          
+            vec3 dir = vec3(0, 0, 1);
+            
+            vec3 nPos = normalize(vPos);
+            
+            float dotProduct = dot(dir, nPos);
+            
+            float iris = smoothstep(0.75, 0.8, dotProduct);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0, 0, 1), iris);
+            
+            float pupil = smoothstep(0.95, 0.97, dotProduct);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0), pupil);
+          `
+        );
+        console.log(shader.fragmentShader);
+      },
+    });
+    super(g, m);
+  }
+}
+
+class Eyes extends THREE.Group {
+  constructor(camera, mouse) {
+    super();
+    this.camera = camera;
+
+    this.plane = new THREE.Plane();
+    this.planeNormal = new THREE.Vector3();
+    this.planePoint = new THREE.Vector3();
+
+    this.pointer = new THREE.Vector2();
+    this.raycaster = new THREE.Raycaster();
+
+    this.lookAt = new THREE.Vector3();
+
+    this.eyes = new Array(2).fill().map((_, idx) => {
+      let eye = new EyeBall();
+      eye.position.x = idx < 1 ? 0 : 0.87;
+      eye.position.y = idx < 1 ? 0 : 0.05;
+      eye.position.z = idx < 1 ? 0 : -0.1;
+      this.add(eye);
+      return eye;
+    });
+
+    document.addEventListener('pointermove', (event) => {
+      this.pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      this.pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    });
+  }
+
+  update() {
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+
+    this.camera.getWorldDirection(this.planeNormal);
+    this.planePoint
+      .copy(this.planeNormal)
+      .setLength(5)
+      .add(this.camera.position);
+    this.plane.setFromNormalAndCoplanarPoint(this.planeNormal, this.planePoint);
+
+    this.raycaster.ray.intersectPlane(this.plane, this.lookAt);
+
+    this.eyes.forEach((eye) => {
+      eye.lookAt(this.lookAt);
+    });
+  }
+}
 
 let scene, camera, renderer, controls;
 let targetMesh;
+let eyes;
 
 
 init();
-render();
 
 function init() {
 
@@ -54,16 +145,23 @@ function init() {
     }
   );
 
+  eyes = new Eyes(camera);
+  eyes.position.set(-0.18, -0.42, 0.5);
+  scene.add(eyes);
+
   controls = new OrbitControls(camera, renderer.domElement);
   controls.minDistance = 2;
   controls.maxDistance = 5;
   controls.maxPolarAngle = Math.PI / 1.5;
   controls.saveState();
   controls.update();
+  render();
 }
 
 function render() {
   requestAnimationFrame(render);
+
+  eyes.update();
 
   renderer.render(scene, camera);
 }
