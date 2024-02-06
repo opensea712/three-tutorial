@@ -34,9 +34,6 @@ class EyeBall extends THREE.Mesh {
             
             float dotProduct = dot(dir, nPos);
             
-            float iris = smoothstep(0.75, 0.8, dotProduct);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0, 0, 1), iris);
-            
             float pupil = smoothstep(0.95, 0.97, dotProduct);
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0), pupil);
           `
@@ -89,6 +86,7 @@ class Eyes extends THREE.Group {
 
     this.raycaster.ray.intersectPlane(this.plane, this.lookAt);
 
+    this.lookAt.set(this.lookAt.x, this.lookAt.y, this.camera.position.z);
     this.eyes.forEach((eye) => {
       eye.lookAt(this.lookAt);
     });
